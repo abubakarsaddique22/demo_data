@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form,Body
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Body
 from pydantic import BaseModel
 from typing import List, Optional
 from fastapi.middleware.cors import CORSMiddleware
@@ -38,11 +38,21 @@ async def read_file(file: UploadFile) -> List[str]:
     # Split lines and remove empty
     return [line.strip() for line in text.splitlines() if line.strip()]
 
+# ------------------------------
+# Home route
+# ------------------------------
+
+@app.get("/")
+def home():
+    return {"message": "API is running. Go to /docs to test endpoints."}
+
+
 # === Endpoint: Process list (file + manual text) ===
 @app.post("/process-list")
 async def process_list(
     file: Optional[UploadFile] = File(None),
     text_input: Optional[str] = Form(None),
+    json_input: Optional[List[str]] = Body(None)
 ):
     input_items = []
 
@@ -60,6 +70,10 @@ async def process_list(
             else:
                 if line.strip():
                     input_items.append(line.strip())
+    
+    if json_input:
+        input_items.extend([item.strip() for item in json_input if item.strip()])
+    
     # No input provided
     if not input_items:
         raise HTTPException(status_code=400, detail="No valid items provided")
@@ -94,11 +108,9 @@ async def process_list(
     return {
         "corrected_items": corrected_list,
         "details": corrections_info,
-        # "original_count": len(input_items),
-        # "corrected_count": len(corrected_list)
     }
 
-# # === Endpoint: Finalize list ===
+# === Endpoint: Finalize list ===
 @app.post("/finalize-list")
 def finalize_list(data: Optional[FinalList] = None):
     global LAST_PROCESSED_LIST
@@ -115,16 +127,3 @@ def finalize_list(data: Optional[FinalList] = None):
     # Save to DB
     DB["final"].append(final_items)
     return {"status": "success", "message": f"Finalized list with {len(final_items)} items"}
-
-
-# # === Finalize list endpoint ===
-# @app.post("/finalize-list")
-# def finalize_list(data: FinalList):
-#     if not data.final_items:
-#         return {"status": "fail", "message": "Final list cannot be empty"}
-    
-#     try:
-#         DB["final"].append(data.final_items)
-#         return {"status": "success", "message": f"Finalized list with {len(data.final_items)} items"}
-#     except Exception as e:
-#         return {"status": "fail", "message": str(e)}
